@@ -155,24 +155,24 @@ jobs:
           nfpm package \
             --config nfpm.yaml \
             --packager deb \
-            --target "dist/yt-mp3-go_${VERSION}_amd64.deb"
+            --target "dist/youtube-mp3-downloader_${VERSION}_amd64.deb"
 
       - name: Test DEB package
         shell: bash
         run: |
-          dpkg-deb --info "dist/yt-mp3-go_${VERSION}_amd64.deb"
-          sudo apt-get install --yes "./dist/yt-mp3-go_${VERSION}_amd64.deb"
-          test -x /opt/yt-mp3-go/yt-mp3-go
-          test -x /opt/yt-mp3-go/ffmpeg
-          test "$(readlink -f /usr/bin/yt-mp3-go)" = \
-            "/opt/yt-mp3-go/yt-mp3-go"
-          test -f /usr/share/applications/yt-mp3-go.desktop
-          if ldd /opt/yt-mp3-go/yt-mp3-go | grep -q "not found"; then
+          dpkg-deb --info "dist/youtube-mp3-downloader_${VERSION}_amd64.deb"
+          sudo apt-get install --yes "./dist/youtube-mp3-downloader_${VERSION}_amd64.deb"
+          test -x /opt/youtube-mp3-downloader/youtube-mp3-downloader
+          test -x /opt/youtube-mp3-downloader/ffmpeg
+          test "$(readlink -f /usr/bin/youtube-mp3-downloader)" = \
+            "/opt/youtube-mp3-downloader/youtube-mp3-downloader"
+          test -f /usr/share/applications/youtube-mp3-downloader.desktop
+          if ldd /opt/youtube-mp3-downloader/youtube-mp3-downloader | grep -q "not found"; then
             echo "The application has unresolved shared libraries" >&2
             exit 1
           fi
-          /opt/yt-mp3-go/ffmpeg -version
-          sudo apt-get remove --yes yt-mp3-go
+          /opt/youtube-mp3-downloader/ffmpeg -version
+          sudo apt-get remove --yes youtube-mp3-downloader
 
       - name: Upload Linux package
         uses: actions/upload-artifact@v4
@@ -289,7 +289,7 @@ jobs:
         run: |
           $installer = Resolve-Path `
             "dist/youtube-mp3-downloader_${env:VERSION}_windows_amd64_installer.exe"
-          $installDir = Join-Path $env:RUNNER_TEMP "yt-mp3-go-install"
+          $installDir = Join-Path $env:RUNNER_TEMP "youtube-mp3-downloader-install"
           $process = Start-Process `
             -FilePath $installer `
             -ArgumentList "/S", "/D=$installDir" `
@@ -298,7 +298,7 @@ jobs:
           if ($process.ExitCode -ne 0) {
             throw "Installer exited with code $($process.ExitCode)"
           }
-          if (-not (Test-Path "$installDir/yt-mp3-go.exe")) {
+          if (-not (Test-Path "$installDir/youtube-mp3-downloader.exe")) {
             throw "Application executable was not installed"
           }
           if (-not (Test-Path "$installDir/ffmpeg.exe")) {
