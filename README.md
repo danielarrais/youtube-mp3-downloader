@@ -54,11 +54,6 @@ FFmpeg e WebView2:
 
 O instalador será gravado em `build/windows/dist/`.
 
-### GitHub Actions
-
-O workflow `Build Windows` pode ser executado manualmente. O artefato contém o
-aplicativo, `ffmpeg.exe` e o bootstrapper do WebView2.
-
 ## Release
 
 Tags no formato `vX.Y.Z` executam o workflow `Release`. Ele valida o projeto,
