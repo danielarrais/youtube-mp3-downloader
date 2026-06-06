@@ -10,8 +10,13 @@ Requisitos:
 
 - Go 1.26
 - Node.js 20+
-- FFmpeg
 - Dependências nativas do Wails para o sistema operacional
+
+Na primeira conversão, o aplicativo procura o FFmpeg empacotado ou instalado no
+sistema. Caso não encontre, baixa e valida automaticamente uma build para
+Linux ou Windows (`amd64` e `arm64`), armazenada em
+`~/.yt-mp3-downloader-bin/`. Portanto, o primeiro uso requer acesso à internet,
+mas o binário não precisa ser versionado no repositório.
 
 No Linux com WebKitGTK 4.1:
 

@@ -5,6 +5,7 @@ go 1.26
 require (
 	github.com/google/uuid v1.6.0
 	github.com/kkdai/youtube/v2 v2.10.6
+	github.com/ulikunitz/xz v0.5.15
 	github.com/wailsapp/wails/v2 v2.11.0
 	golang.org/x/sys v0.42.0
 )

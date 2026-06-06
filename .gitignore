@@ -35,6 +35,7 @@ coverage/
 /frontend/.vite/
 
 # Wails and release artifacts
+/bin/
 /build/bin/
 /build/windows/dist/
 /build/windows/installer/resources/ffmpeg.exe

@@ -154,3 +154,12 @@ func TestFormatOperationErrorUsesLanguage(t *testing.T) {
 		t.Fatalf("unexpected English error: %q", got)
 	}
 }
+
+func TestFFmpegMP3ArgsDeclaresFormatForPartFile(t *testing.T) {
+	args := ffmpegMP3Args("input.webm", "song.mp3.part", "192k")
+	want := []string{"-y", "-i", "input.webm", "-b:a", "192k", "-f", "mp3", "song.mp3.part"}
+
+	if fmt.Sprint(args) != fmt.Sprint(want) {
+		t.Fatalf("ffmpegMP3Args() = %v, want %v", args, want)
+	}
+}

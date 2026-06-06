@@ -379,7 +379,7 @@ func ConvertToMp3(ctx context.Context, inputPath string, outputPath string, qual
 	}
 
 	var stderr bytes.Buffer
-	cmd := exec.CommandContext(ctx, ffmpegPath, "-y", "-i", inputPath, "-b:a", bitrate, outputPath)
+	cmd := exec.CommandContext(ctx, ffmpegPath, ffmpegMP3Args(inputPath, outputPath, bitrate)...)
 	cmd.Stderr = &stderr
 
 	err = cmd.Run()
@@ -387,4 +387,8 @@ func ConvertToMp3(ctx context.Context, inputPath string, outputPath string, qual
 		return fmt.Errorf("ffmpeg error: %v, detail: %s", err, stderr.String())
 	}
 	return nil
+}
+
+func ffmpegMP3Args(inputPath, outputPath, bitrate string) []string {
+	return []string{"-y", "-i", inputPath, "-b:a", bitrate, "-f", "mp3", outputPath}
 }
