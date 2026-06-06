@@ -20,6 +20,7 @@ export function SettingsModal({
   const [selectedDir, setSelectedDir] = useState(downloadDir);
   const [selectedQuality, setSelectedQuality] = useState(quality);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
   const chooseFolder = async () => {
     const folder = await onChooseFolder();
@@ -28,9 +29,12 @@ export function SettingsModal({
 
   const save = async () => {
     setSaving(true);
+    setError('');
     try {
       await onSave(selectedDir, selectedQuality);
       onClose();
+    } catch {
+      setError(t.settingsSaveError);
     } finally {
       setSaving(false);
     }
@@ -70,6 +74,7 @@ export function SettingsModal({
               <option value="320k">320 kbps</option>
             </select>
           </div>
+          {error && <p className="text-sm text-red-400">{error}</p>}
         </div>
 
         <div className="flex justify-end gap-3 border-t border-gray-700 px-5 py-4">

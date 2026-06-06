@@ -16,8 +16,6 @@ function App() {
     pauseQueue,
     resumeQueue,
     clearAll,
-    autoDownload,
-    setAutoDownload,
   } = useDownloads();
 
   return (
@@ -25,11 +23,7 @@ function App() {
       <Header stats={stats} />
       
       <main className="max-w-4xl mx-auto px-6 py-8 space-y-8">
-        <UrlInput 
-          onSubmit={addDownloads}
-          autoDownload={autoDownload}
-          onAutoDownloadChange={setAutoDownload}
-        />
+        <UrlInput onSubmit={addDownloads} />
         
         <DownloadQueue
           downloads={downloads}

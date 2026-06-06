@@ -1,5 +1,6 @@
 // Importa as funções geradas pelo Wails
 import * as WailsApp from '../../wailsjs/go/main/App';
+import { main } from '../../wailsjs/go/models';
 
 export const api = {
   addDownloads: async (urls: string[], quality: string) => {
@@ -19,7 +20,7 @@ export const api = {
   },
 
   retryFailed: async () => {
-    return await (WailsApp as any).RetryFailed();
+    return await WailsApp.RetryFailed();
   },
 
   getStats: async () => {
@@ -55,30 +56,23 @@ export const api = {
   },
 
   openDirectory: async (path: string) => {
-    return await (WailsApp as any).OpenDirectory(path);
+    return await WailsApp.OpenDirectory(path);
   },
 
   // Funções de Configuração e Pasta
   getConfig: async () => {
-    return await (WailsApp as any).GetConfig();
+    return await WailsApp.GetConfig();
   },
 
   selectFolder: async () => {
-    return await (WailsApp as any).SelectFolder();
+    return await WailsApp.SelectFolder();
   },
 
-  saveConfig: async (config: { download_dir: string; quality: string }) => {
-    return await (WailsApp as any).SaveConfig(config);
+  saveConfig: async (config: main.Config) => {
+    return await WailsApp.SaveConfig(config);
   },
 
   setLanguage: async (language: string) => {
-    return await (WailsApp as any).SetLanguage(language);
-  },
-
-  getFileUrl: (filename: string) => ``, 
-  deleteAllFiles: async () => {
-    return await WailsApp.ClearAll();
+    return await WailsApp.SetLanguage(language);
   },
 };
-
-export const WS_URL = ""; 

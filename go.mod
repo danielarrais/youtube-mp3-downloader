@@ -41,5 +41,3 @@ require (
 	golang.org/x/net v0.52.0 // indirect
 	golang.org/x/text v0.35.0 // indirect
 )
-
-// replace github.com/wailsapp/wails/v2 v2.12.0 => /home/testrigor/.asdf/installs/golang/1.22.12/packages/pkg/mod

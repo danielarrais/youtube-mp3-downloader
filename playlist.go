@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -43,6 +44,10 @@ type playlistRequestClient struct {
 }
 
 func FetchPlaylistInfo(rawURL string) (PlaylistInfo, error) {
+	return FetchPlaylistInfoContext(context.Background(), rawURL)
+}
+
+func FetchPlaylistInfoContext(ctx context.Context, rawURL string) (PlaylistInfo, error) {
 	playlistID, err := extractPlaylistID(rawURL)
 	if err != nil {
 		return PlaylistInfo{}, err
@@ -53,7 +58,7 @@ func FetchPlaylistInfo(rawURL string) (PlaylistInfo, error) {
 	continuation := ""
 
 	for {
-		body, err := fetchPlaylistPage(playlistID, continuation)
+		body, err := fetchPlaylistPage(ctx, playlistID, continuation)
 		if err != nil {
 			return PlaylistInfo{}, err
 		}
@@ -116,7 +121,7 @@ func extractPlaylistID(rawURL string) (string, error) {
 	return id, nil
 }
 
-func fetchPlaylistPage(playlistID, continuation string) ([]byte, error) {
+func fetchPlaylistPage(ctx context.Context, playlistID, continuation string) ([]byte, error) {
 	requestBody := playlistBrowseRequest{
 		Context: playlistRequestContext{Client: playlistRequestClient{
 			ClientName:        "ANDROID_VR",
@@ -142,7 +147,7 @@ func fetchPlaylistPage(playlistID, continuation string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	request, err := http.NewRequest(http.MethodPost, youtubeBrowseURL, bytes.NewReader(data))
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, youtubeBrowseURL, bytes.NewReader(data))
 	if err != nil {
 		return nil, err
 	}

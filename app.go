@@ -2,12 +2,9 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
-	goruntime "runtime"
 	"strings"
 	"sync"
 	"time"
@@ -16,45 +13,14 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
-type Config struct {
-	DownloadDir string `json:"download_dir"`
-	Quality     string `json:"quality"`
-	Language    string `json:"language"`
-}
-
-var globalConfig Config
-
-func loadConfig() {
-	home, _ := os.UserHomeDir()
-	configPath := filepath.Join(home, ".yt-mp3-downloader-config.json")
-	data, err := os.ReadFile(configPath)
-	if err == nil {
-		json.Unmarshal(data, &globalConfig)
-	}
-	if globalConfig.DownloadDir == "" {
-		globalConfig.DownloadDir = filepath.Join(home, "Downloads", "YT-MP3")
-	}
-	if globalConfig.Quality == "" {
-		globalConfig.Quality = "192k"
-	}
-	if globalConfig.Language != "en-US" {
-		globalConfig.Language = "pt-BR"
-	}
-}
-
-func saveConfig(conf Config) {
-	globalConfig = conf
-	home, _ := os.UserHomeDir()
-	configPath := filepath.Join(home, ".yt-mp3-downloader-config.json")
-	data, _ := json.Marshal(conf)
-	os.WriteFile(configPath, data, 0644)
-}
-
 type App struct {
 	ctx        context.Context
+	config     Config
+	configPath string
 	items      map[string]*DownloadItem
 	queueOrder []string
 	mu         sync.Mutex
+	configMu   sync.Mutex
 	persistMu  sync.Mutex
 	cacheDir   string
 	queuePath  string
@@ -65,12 +31,17 @@ type App struct {
 }
 
 func NewApp() *App {
-	home, _ := os.UserHomeDir()
+	home, err := os.UserHomeDir()
+	if err != nil {
+		home = "."
+	}
 	configDir, err := os.UserConfigDir()
 	if err != nil {
 		configDir = filepath.Join(home, ".config")
 	}
 	return &App{
+		config:     defaultConfig(home),
+		configPath: filepath.Join(home, ".yt-mp3-downloader-config.json"),
 		items:      make(map[string]*DownloadItem),
 		queueOrder: make([]string, 0),
 		cacheDir:   filepath.Join(home, ".yt-mp3-downloader-cache"),
@@ -81,9 +52,21 @@ func NewApp() *App {
 
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
-	loadConfig()
-	os.MkdirAll(globalConfig.DownloadDir, 0755)
-	os.MkdirAll(a.cacheDir, 0755)
+	config, err := loadConfigFile(a.configPath, a.config)
+	if err != nil {
+		fmt.Printf("Erro ao carregar configuração: %v\n", err)
+	} else {
+		a.config = config
+	}
+	if err := os.MkdirAll(a.config.DownloadDir, 0755); err != nil {
+		fmt.Printf("Erro ao criar pasta de download: %v\n", err)
+	}
+	if err := os.MkdirAll(a.cacheDir, 0755); err != nil {
+		fmt.Printf("Erro ao criar cache: %v\n", err)
+	}
+	if err := cleanupPartialFiles(a.config.DownloadDir); err != nil {
+		fmt.Printf("Erro ao limpar arquivos parciais: %v\n", err)
+	}
 	if err := a.loadQueue(); err != nil {
 		fmt.Printf("Erro ao carregar fila: %v\n", err)
 	}
@@ -98,120 +81,6 @@ func (a *App) shutdown(context.Context) {
 		stop()
 	}
 	a.persistQueue()
-}
-
-func (a *App) processDownload(ctx context.Context, item *DownloadItem) {
-	video, err := GetVideoInfoContext(ctx, item.URL)
-
-	if err != nil {
-		if ctx.Err() != nil {
-			a.cleanupInterruptedDownload(item.ID, "")
-			return
-		}
-		a.mu.Lock()
-		language := globalConfig.Language
-		a.mu.Unlock()
-		a.updateError(item.ID, FormatYouTubeError(err, language))
-		return
-	}
-
-	a.mu.Lock()
-	if !a.isActiveItemLocked(item.ID) {
-		a.mu.Unlock()
-		return
-	}
-	item.Title = video.Title
-	a.mu.Unlock()
-	a.persistQueue()
-	a.emitItemUpdate(item.ID)
-
-	safeTitle := SanitizeFilename(video.Title)
-	a.mu.Lock()
-	downloadDir := globalConfig.DownloadDir
-	a.mu.Unlock()
-	outputPath := filepath.Join(downloadDir, safeTitle+".mp3")
-
-	if _, err := os.Stat(outputPath); err == nil {
-		if ctx.Err() != nil {
-			a.cleanupInterruptedDownload(item.ID, "")
-			return
-		}
-		if !a.setActiveItemStatus(item.ID, StatusSkipped) {
-			return
-		}
-		a.mu.Lock()
-		if !a.isActiveItemLocked(item.ID) {
-			a.mu.Unlock()
-			return
-		}
-		item.FilePath = outputPath
-		fi, _ := os.Stat(outputPath)
-		item.FileSize = fi.Size()
-		a.mu.Unlock()
-		a.persistQueue()
-		a.emitItemUpdate(item.ID)
-		return
-	}
-
-	if !a.setActiveItemStatus(item.ID, StatusDownloading) {
-		return
-	}
-	tempPath := filepath.Join(a.cacheDir, item.ID+".tmp")
-
-	_, err = DownloadAudio(ctx, video, tempPath, func(percent float64, downloaded int64, total int64) {
-		a.mu.Lock()
-		if a.isActiveItemLocked(item.ID) {
-			item.Progress.Percent = percent
-			item.Progress.DownloadedBytes = downloaded
-			item.Progress.TotalBytes = total
-		}
-		a.mu.Unlock()
-		a.emitItemUpdate(item.ID)
-	})
-
-	if err != nil {
-		if ctx.Err() != nil {
-			a.cleanupInterruptedDownload(item.ID, tempPath)
-			return
-		}
-		a.updateError(item.ID, "Erro download: "+err.Error())
-		return
-	}
-
-	if !a.setActiveItemStatus(item.ID, StatusConverting) {
-		os.Remove(tempPath)
-		return
-	}
-	err = ConvertToMp3(ctx, tempPath, outputPath, item.Quality)
-	os.Remove(tempPath)
-
-	if err != nil {
-		if ctx.Err() != nil {
-			os.Remove(outputPath)
-			a.cleanupInterruptedDownload(item.ID, "")
-			return
-		}
-		a.updateError(item.ID, "Erro conversão: "+err.Error())
-		return
-	}
-
-	fi, _ := os.Stat(outputPath)
-	a.mu.Lock()
-	if !a.isActiveItemLocked(item.ID) {
-		a.mu.Unlock()
-		os.Remove(outputPath)
-		return
-	}
-	item.Status = StatusCompleted
-	item.FilePath = outputPath
-	item.FileSize = fi.Size()
-	item.CompletedAt = time.Now().Format(time.RFC3339)
-	item.Progress.Percent = 100
-	a.mu.Unlock()
-
-	a.persistQueue()
-	a.emitItemUpdate(item.ID)
-	a.emitStats()
 }
 
 func (a *App) AddDownloads(urls []string, quality string) []DownloadItem {
@@ -420,11 +289,7 @@ func (a *App) RetryDownload(id string) DownloadItem {
 		a.mu.Unlock()
 		return DownloadItem{}
 	}
-	item.Status = StatusPending
-	item.Error = ""
-	item.StartedAt = ""
-	item.CompletedAt = ""
-	item.Progress = DownloadProgress{Speed: "---", ETA: "---"}
+	resetItemForRetry(item)
 	result := *item
 	a.mu.Unlock()
 	a.persistQueue()
@@ -440,11 +305,7 @@ func (a *App) RetryFailed() {
 		if item.Status != StatusFailed {
 			continue
 		}
-		item.Status = StatusPending
-		item.Error = ""
-		item.StartedAt = ""
-		item.CompletedAt = ""
-		item.Progress = DownloadProgress{Speed: "---", ETA: "---"}
+		resetItemForRetry(item)
 	}
 	a.paused = false
 	a.mu.Unlock()
@@ -463,11 +324,7 @@ func (a *App) PauseQueue() {
 	activeID := a.activeID
 	stop := a.activeStop
 	if item, ok := a.items[activeID]; ok {
-		item.Status = StatusPending
-		item.Error = ""
-		item.StartedAt = ""
-		item.CompletedAt = ""
-		item.Progress = DownloadProgress{Speed: "---", ETA: "---"}
+		resetItemForRetry(item)
 	}
 	a.mu.Unlock()
 	if stop != nil {
@@ -478,6 +335,20 @@ func (a *App) PauseQueue() {
 		a.emitItemUpdate(activeID)
 	}
 	a.emitStats()
+}
+
+func resetItemForRetry(item *DownloadItem) {
+	item.Status = StatusPending
+	item.Error = ""
+	item.StartedAt = ""
+	item.CompletedAt = ""
+	item.Progress = DownloadProgress{Speed: "---", ETA: "---"}
+}
+
+func (a *App) currentLanguage() string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.config.Language
 }
 
 func (a *App) ResumeQueue() {
@@ -492,85 +363,8 @@ func (a *App) ResumeQueue() {
 	a.emitStats()
 	a.signalWorker()
 }
-func (a *App) OpenFolder(path string) error {
-	return openDirectory(filepath.Dir(path))
-}
-
-func (a *App) OpenDirectory(path string) error {
-	return openDirectory(path)
-}
-
-func openDirectory(path string) error {
-	switch goruntime.GOOS {
-	case "windows":
-		return exec.Command("explorer.exe", path).Start()
-	case "darwin":
-		return exec.Command("open", path).Start()
-	default:
-		return exec.Command("xdg-open", path).Start()
-	}
-}
-func (a *App) GetConfig() Config {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	return globalConfig
-}
-func (a *App) SaveConfig(config Config) Config {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	if config.DownloadDir == "" {
-		config.DownloadDir = globalConfig.DownloadDir
-	}
-	switch config.Quality {
-	case "128k", "192k", "320k":
-	default:
-		config.Quality = "192k"
-	}
-	if config.Language != "en-US" {
-		config.Language = globalConfig.Language
-	}
-	saveConfig(config)
-	os.MkdirAll(globalConfig.DownloadDir, 0755)
-	return globalConfig
-}
-func (a *App) SetLanguage(language string) {
-	if language != "en-US" {
-		language = "pt-BR"
-	}
-
-	a.mu.Lock()
-	globalConfig.Language = language
-	updatedIDs := make([]string, 0)
-	for id, item := range a.items {
-		if item.Status == StatusFailed {
-			item.Error = TranslateStoredYouTubeError(item.Error, language)
-			updatedIDs = append(updatedIDs, id)
-		}
-	}
-	config := globalConfig
-	saveConfig(config)
-	a.mu.Unlock()
-
-	a.persistQueue()
-	for _, id := range updatedIDs {
-		a.emitItemUpdate(id)
-	}
-}
 func (a *App) GetPlaylistInfo(url string) (PlaylistInfo, error) {
 	return FetchPlaylistInfo(url)
-}
-func (a *App) SelectFolder() string {
-	a.mu.Lock()
-	defaultDirectory := globalConfig.DownloadDir
-	a.mu.Unlock()
-	folder, err := runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{
-		Title:            "Selecione a pasta de download",
-		DefaultDirectory: defaultDirectory,
-	})
-	if err != nil || folder == "" {
-		return ""
-	}
-	return folder
 }
 func (a *App) ClearCompleted() {
 	a.mu.Lock()

@@ -17,13 +17,6 @@ export function DownloadItem({ item, onCancel, onRetry }: DownloadItemProps) {
   const canRetry = ['failed', 'cancelled'].includes(item.status);
   const canDownload = ['completed', 'skipped'].includes(item.status);
 
-  const getFilename = () => {
-    if (item.file_path) {
-      return item.file_path.split('/').pop() || '';
-    }
-    return '';
-  };
-
   return (
     <div className="bg-gray-800 rounded-lg p-4 space-y-3">
       <div className="flex items-start justify-between gap-4">

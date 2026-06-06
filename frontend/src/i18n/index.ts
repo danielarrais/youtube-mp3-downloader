@@ -19,7 +19,7 @@ export interface Translations {
   downloadFolder: string;
   chooseFolder: string;
   save: string;
-  autoDownload: string;
+  settingsSaveError: string;
   selectPlaylistVideos: string;
   selectAll: string;
   clearSelection: string;
@@ -73,7 +73,7 @@ export const translations: Record<Language, Translations> = {
     downloadFolder: 'Pasta de download',
     chooseFolder: 'Escolher pasta',
     save: 'Salvar',
-    autoDownload: 'Download automático ao concluir',
+    settingsSaveError: 'Não foi possível salvar as configurações.',
     selectPlaylistVideos: 'Selecione os vídeos das playlists',
     selectAll: 'Selecionar todos',
     clearSelection: 'Desmarcar todos',
@@ -119,7 +119,7 @@ export const translations: Record<Language, Translations> = {
     downloadFolder: 'Download folder',
     chooseFolder: 'Choose folder',
     save: 'Save',
-    autoDownload: 'Auto download when complete',
+    settingsSaveError: 'Could not save the settings.',
     selectPlaylistVideos: 'Select playlist videos',
     selectAll: 'Select all',
     clearSelection: 'Clear selection',

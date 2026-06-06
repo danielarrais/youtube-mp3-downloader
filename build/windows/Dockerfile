@@ -1,6 +1,6 @@
 FROM golang:1.26-bookworm AS builder
 
-ARG WAILS_VERSION=v2.12.0
+ARG WAILS_VERSION=v2.11.0
 ARG FFMPEG_URL=https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip
 
 RUN apt-get update && \

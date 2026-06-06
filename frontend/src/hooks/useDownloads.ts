@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { api } from '../services/api';
 import { DownloadItem, QueueStats } from '../types';
+import { EventsOn } from '../../wailsjs/runtime/runtime';
 
 export function useDownloads() {
   const [downloads, setDownloads] = useState<DownloadItem[]>([]);
@@ -23,16 +24,28 @@ export function useDownloads() {
   }, []);
 
   useEffect(() => {
-    console.log("JS: Iniciando loop de atualização...");
     refreshData();
-    const interval = setInterval(() => {
-      refreshData();
-    }, 3000);
-    return () => clearInterval(interval);
+    const stopItemUpdates = EventsOn('download:update', (item: DownloadItem) => {
+      setDownloads(current => {
+        const index = current.findIndex(existing => existing.id === item.id);
+        if (index < 0) return [...current, item];
+        const next = [...current];
+        next[index] = item;
+        return next;
+      });
+    });
+    const stopStatsUpdates = EventsOn('queue:stats', (nextStats: QueueStats) => {
+      setStats(nextStats);
+    });
+    const interval = setInterval(refreshData, 30000);
+    return () => {
+      stopItemUpdates();
+      stopStatsUpdates();
+      clearInterval(interval);
+    };
   }, [refreshData]);
 
   const addDownloads = useCallback(async (urls: string[], quality: string) => {
-    console.log("JS: Adicionando...", urls);
     try {
       await api.addDownloads(urls, quality);
       await refreshData();
@@ -42,7 +55,7 @@ export function useDownloads() {
   }, [refreshData]);
 
   return {
-    downloads, stats, addDownloads, 
+    downloads, stats, addDownloads,
     cancelDownload: async (id: string) => { await api.cancelDownload(id); refreshData(); },
     retryDownload: async (id: string) => { await api.retryDownload(id); refreshData(); },
     retryFailed: async () => { await api.retryFailed(); refreshData(); },
@@ -50,8 +63,6 @@ export function useDownloads() {
     cancelAll: async () => { await api.cancelAll(); refreshData(); },
     pauseQueue: async () => { await api.pauseQueue(); refreshData(); },
     resumeQueue: async () => { await api.resumeQueue(); refreshData(); },
-    clearAll: async () => { await api.clearAll(); refreshData(); },
-    autoDownload: false,
-    setAutoDownload: () => {}
+    clearAll: async () => { await api.clearAll(); refreshData(); }
   };
 }

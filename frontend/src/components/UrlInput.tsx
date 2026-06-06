@@ -7,14 +7,12 @@ import { SettingsModal } from './SettingsModal';
 
 interface UrlInputProps {
   onSubmit: (urls: string[], quality: string) => void;
-  autoDownload: boolean;
-  onAutoDownloadChange: (value: boolean) => void;
 }
 
 const cleanYouTubeUrl = (value: string) => value.trim().split('&', 1)[0];
 
-export function UrlInput({ onSubmit, autoDownload, onAutoDownloadChange }: UrlInputProps) {
-  const { t } = useTranslation();
+export function UrlInput({ onSubmit }: UrlInputProps) {
+  const { t, language } = useTranslation();
   const [urls, setUrls] = useState('');
   const [quality, setQuality] = useState('192k');
   const [downloadDir, setDownloadDir] = useState('---');
@@ -25,7 +23,7 @@ export function UrlInput({ onSubmit, autoDownload, onAutoDownloadChange }: UrlIn
 
   // Carrega configuração inicial
   useEffect(() => {
-    (api as any).getConfig?.().then((config: any) => {
+    api.getConfig().then(config => {
       if (config) {
         setDownloadDir(config.download_dir || '---');
         setQuality(config.quality || '192k');
@@ -141,14 +139,15 @@ export function UrlInput({ onSubmit, autoDownload, onAutoDownloadChange }: UrlIn
   };
 
   const handleSelectFolder = async () => {
-    const newPath = await (api as any).selectFolder?.();
+    const newPath = await api.selectFolder();
     return newPath || undefined;
   };
 
   const handleSaveSettings = async (newDownloadDir: string, newQuality: string) => {
-    const config = await (api as any).saveConfig?.({
+    const config = await api.saveConfig({
       download_dir: newDownloadDir,
       quality: newQuality,
+      language,
     });
     setDownloadDir(config?.download_dir || newDownloadDir);
     setQuality(config?.quality || newQuality);
