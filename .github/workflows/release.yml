@@ -167,6 +167,7 @@ jobs:
           test "$(readlink -f /usr/bin/youtube-mp3-downloader)" = \
             "/opt/youtube-mp3-downloader/youtube-mp3-downloader"
           test -f /usr/share/applications/youtube-mp3-downloader.desktop
+          test -f /usr/share/pixmaps/youtube-mp3-downloader.png
           if ldd /opt/youtube-mp3-downloader/youtube-mp3-downloader | grep -q "not found"; then
             echo "The application has unresolved shared libraries" >&2
             exit 1
