@@ -1,0 +1,348 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+env:
+  GO_VERSION: "1.26.4"
+  NODE_VERSION: "20.19.4"
+  WAILS_VERSION: "v2.12.0"
+  NFPM_VERSION: "v2.46.3"
+  FFMPEG_BASE_URL: "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest"
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Validate release tag
+        shell: bash
+        run: |
+          if [[ ! "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid release tag: $GITHUB_REF_NAME" >&2
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes libgtk-3-dev libwebkit2gtk-4.1-dev
+
+      - name: Install frontend dependencies
+        run: npm ci --prefix frontend
+
+      - name: Build frontend
+        run: npm run build --prefix frontend
+
+      - name: Test backend
+        run: go test -race -tags webkit2_41 ./...
+
+      - name: Vet backend
+        run: go vet -tags webkit2_41 ./...
+
+      - name: Check Go vulnerabilities
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
+  linux:
+    needs: validate
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes \
+            libgtk-3-dev \
+            libwebkit2gtk-4.1-dev \
+            xz-utils
+          go install github.com/wailsapp/wails/v2/cmd/wails@${WAILS_VERSION}
+          go install github.com/goreleaser/nfpm/v2/cmd/nfpm@${NFPM_VERSION}
+
+      - name: Install frontend dependencies
+        run: npm ci --prefix frontend
+
+      - name: Set release version
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+          jq --arg version "$version" \
+            '.info.productVersion = $version' \
+            wails.json > wails.release.json
+          mv wails.release.json wails.json
+
+      - name: Download verified FFmpeg
+        shell: bash
+        run: |
+          filename="ffmpeg-master-latest-linux64-gpl.tar.xz"
+          mkdir -p build/linux/package /tmp/ffmpeg
+          curl --fail --location --retry 3 \
+            "$FFMPEG_BASE_URL/checksums.sha256" \
+            --output /tmp/checksums.sha256
+          curl --fail --location --retry 3 \
+            "$FFMPEG_BASE_URL/$filename" \
+            --output "/tmp/$filename"
+          grep "  $filename$" /tmp/checksums.sha256 \
+            > /tmp/ffmpeg-checksum.sha256
+          (
+            cd /tmp
+            sha256sum --check ffmpeg-checksum.sha256
+          )
+          tar --extract --xz --file "/tmp/$filename" --directory /tmp/ffmpeg
+          ffmpeg_path="$(find /tmp/ffmpeg -type f -name ffmpeg -print -quit)"
+          test -n "$ffmpeg_path"
+          install -m 0755 "$ffmpeg_path" build/linux/package/ffmpeg
+          build/linux/package/ffmpeg -version
+
+      - name: Build Linux application
+        run: |
+          wails build \
+            -platform linux/amd64 \
+            -tags webkit2_41 \
+            -trimpath \
+            -ldflags "-s -w" \
+            -clean
+
+      - name: Build DEB package
+        shell: bash
+        run: |
+          mkdir -p dist
+          nfpm package \
+            --config nfpm.yaml \
+            --packager deb \
+            --target "dist/yt-mp3-go_${VERSION}_amd64.deb"
+
+      - name: Test DEB package
+        shell: bash
+        run: |
+          dpkg-deb --info "dist/yt-mp3-go_${VERSION}_amd64.deb"
+          sudo apt-get install --yes "./dist/yt-mp3-go_${VERSION}_amd64.deb"
+          test -x /opt/yt-mp3-go/yt-mp3-go
+          test -x /opt/yt-mp3-go/ffmpeg
+          test "$(readlink -f /usr/bin/yt-mp3-go)" = \
+            "/opt/yt-mp3-go/yt-mp3-go"
+          test -f /usr/share/applications/yt-mp3-go.desktop
+          if ldd /opt/yt-mp3-go/yt-mp3-go | grep -q "not found"; then
+            echo "The application has unresolved shared libraries" >&2
+            exit 1
+          fi
+          /opt/yt-mp3-go/ffmpeg -version
+          sudo apt-get remove --yes yt-mp3-go
+
+      - name: Upload Linux package
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-linux-amd64
+          path: dist/*.deb
+          if-no-files-found: error
+
+  windows:
+    needs: validate
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install build tools
+        shell: pwsh
+        run: |
+          choco install nsis --yes --no-progress
+          go install github.com/wailsapp/wails/v2/cmd/wails@$env:WAILS_VERSION
+          "C:\Program Files (x86)\NSIS" |
+            Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          (Join-Path (go env GOPATH) "bin") |
+            Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Install frontend dependencies
+        run: npm ci --prefix frontend
+
+      - name: Set release version
+        shell: pwsh
+        run: |
+          $version = $env:GITHUB_REF_NAME.TrimStart("v")
+          "VERSION=$version" |
+            Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          $config = Get-Content wails.json -Raw | ConvertFrom-Json
+          $config.info.productVersion = $version
+          $config | ConvertTo-Json -Depth 10 | Set-Content wails.json
+
+      - name: Download verified FFmpeg
+        shell: pwsh
+        run: |
+          $filename = "ffmpeg-master-latest-win64-gpl.zip"
+          $archive = Join-Path $env:RUNNER_TEMP $filename
+          $checksums = Join-Path $env:RUNNER_TEMP "checksums.sha256"
+          $extract = Join-Path $env:RUNNER_TEMP "ffmpeg"
+          Invoke-WebRequest `
+            -Uri "$env:FFMPEG_BASE_URL/checksums.sha256" `
+            -OutFile $checksums
+          Invoke-WebRequest `
+            -Uri "$env:FFMPEG_BASE_URL/$filename" `
+            -OutFile $archive
+          $line = Get-Content $checksums |
+            Where-Object { $_ -match "  $([regex]::Escape($filename))$" } |
+            Select-Object -First 1
+          if (-not $line) {
+            throw "Checksum not found for $filename"
+          }
+          $expected = ($line -split "\s+")[0].ToLowerInvariant()
+          $actual = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -ne $expected) {
+            throw "Invalid FFmpeg checksum"
+          }
+          Expand-Archive -Path $archive -DestinationPath $extract
+          $ffmpeg = Get-ChildItem $extract -Recurse -Filter "ffmpeg.exe" |
+            Select-Object -First 1
+          if (-not $ffmpeg) {
+            throw "ffmpeg.exe was not found in the downloaded archive"
+          }
+          New-Item -ItemType Directory `
+            -Force "build/windows/installer/resources" | Out-Null
+          Copy-Item $ffmpeg.FullName `
+            "build/windows/installer/resources/ffmpeg.exe"
+          & "build/windows/installer/resources/ffmpeg.exe" -version
+
+      - name: Build Windows installer
+        shell: pwsh
+        run: |
+          wails build `
+            -platform windows/amd64 `
+            -nsis `
+            -webview2 embed `
+            -trimpath `
+            -ldflags "-s -w" `
+            -clean
+          $installer = Get-ChildItem build/bin -Filter "*-installer.exe" |
+            Select-Object -First 1
+          if (-not $installer) {
+            throw "Windows installer was not generated"
+          }
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item $installer.FullName `
+            "dist/youtube-mp3-downloader_${env:VERSION}_windows_amd64_installer.exe"
+
+      - name: Test Windows installer
+        shell: pwsh
+        run: |
+          $installer = Resolve-Path `
+            "dist/youtube-mp3-downloader_${env:VERSION}_windows_amd64_installer.exe"
+          $installDir = Join-Path $env:RUNNER_TEMP "yt-mp3-go-install"
+          $process = Start-Process `
+            -FilePath $installer `
+            -ArgumentList "/S", "/D=$installDir" `
+            -Wait `
+            -PassThru
+          if ($process.ExitCode -ne 0) {
+            throw "Installer exited with code $($process.ExitCode)"
+          }
+          if (-not (Test-Path "$installDir/yt-mp3-go.exe")) {
+            throw "Application executable was not installed"
+          }
+          if (-not (Test-Path "$installDir/ffmpeg.exe")) {
+            throw "FFmpeg was not installed"
+          }
+          & "$installDir/ffmpeg.exe" -version
+          if (Test-Path "$installDir/uninstall.exe") {
+            Start-Process `
+              -FilePath "$installDir/uninstall.exe" `
+              -ArgumentList "/S" `
+              -Wait
+          }
+
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-windows-amd64
+          path: dist/*.exe
+          if-no-files-found: error
+
+  publish:
+    needs:
+      - linux
+      - windows
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download release assets
+        uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Generate checksums
+        working-directory: release-assets
+        run: sha256sum *.deb *.exe > SHA256SUMS
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          if gh release view "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" \
+              --repo "$GITHUB_REPOSITORY" \
+              --clobber \
+              release-assets/*
+          else
+            gh release create "$GITHUB_REF_NAME" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "$GITHUB_REF_NAME" \
+              --generate-notes \
+              --latest \
+              release-assets/*
+          fi

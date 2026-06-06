@@ -56,5 +56,17 @@ O instalador será gravado em `build/windows/dist/`.
 
 ### GitHub Actions
 
-O workflow `Build Windows` pode ser executado manualmente ou por uma tag `v*`.
-O artefato contém o aplicativo, `ffmpeg.exe` e o bootstrapper do WebView2.
+O workflow `Build Windows` pode ser executado manualmente. O artefato contém o
+aplicativo, `ffmpeg.exe` e o bootstrapper do WebView2.
+
+## Release
+
+Tags no formato `vX.Y.Z` executam o workflow `Release`. Ele valida o projeto,
+gera um instalador Windows `amd64` e um pacote DEB para Ubuntu 24.04+
+`amd64`, inclui o FFmpeg em ambos e publica os arquivos com `SHA256SUMS` na
+GitHub Release.
+
+```bash
+git tag -a v1.0.16 -m "Release v1.0.16"
+git push origin v1.0.16
+```

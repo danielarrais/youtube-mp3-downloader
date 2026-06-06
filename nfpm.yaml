@@ -1,0 +1,37 @@
+# yaml-language-server: $schema=https://nfpm.goreleaser.com/schema.json
+name: yt-mp3-go
+arch: amd64
+platform: linux
+version: ${VERSION}
+section: sound
+priority: optional
+maintainer: Daniel Arrais <danielarraiscarvalho@gmail.com>
+description: |
+  Desktop application for downloading YouTube videos and playlists as MP3.
+vendor: Daniel Arrais
+homepage: https://github.com/danielarrais/best-youtube-mp3-downloader
+license: Proprietary
+depends:
+  - ca-certificates
+  - libgtk-3-0t64
+  - libwebkit2gtk-4.1-0
+contents:
+  - src: ./build/bin/yt-mp3-go
+    dst: /opt/yt-mp3-go/yt-mp3-go
+    file_info:
+      mode: 0755
+  - src: ./build/linux/package/ffmpeg
+    dst: /opt/yt-mp3-go/ffmpeg
+    file_info:
+      mode: 0755
+  - src: /opt/yt-mp3-go/yt-mp3-go
+    dst: /usr/bin/yt-mp3-go
+    type: symlink
+  - src: ./build/linux/yt-mp3-go.desktop
+    dst: /usr/share/applications/yt-mp3-go.desktop
+    file_info:
+      mode: 0644
+  - src: ./build/appicon.png
+    dst: /usr/share/icons/hicolor/1024x1024/apps/yt-mp3-go.png
+    file_info:
+      mode: 0644

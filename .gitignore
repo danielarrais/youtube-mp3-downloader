@@ -37,5 +37,7 @@ coverage/
 # Wails and release artifacts
 /bin/
 /build/bin/
+/build/linux/package/
 /build/windows/dist/
 /build/windows/installer/resources/ffmpeg.exe
+/dist/

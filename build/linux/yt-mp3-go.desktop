@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=YouTube MP3 Downloader
+Comment=Download YouTube videos and playlists as MP3
+Exec=yt-mp3-go
+Icon=yt-mp3-go
+Terminal=false
+Categories=AudioVideo;Audio;Network;
+StartupNotify=true
