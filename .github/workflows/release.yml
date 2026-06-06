@@ -1,12 +1,13 @@
 name: Release
 
-on:
+"on":
   push:
     tags:
       - "v*"
+  workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 env:
   GO_VERSION: "1.26.4"
