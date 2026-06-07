@@ -1,7 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { api } from '../services/api';
 import { DownloadItem, QueueStats } from '../types';
-import { EventsOn } from '../../wailsjs/runtime/runtime';
 
 export function useDownloads() {
   const [downloads, setDownloads] = useState<DownloadItem[]>([]);
@@ -25,23 +24,21 @@ export function useDownloads() {
 
   useEffect(() => {
     refreshData();
-    const stopItemUpdates = EventsOn('download:update', (item: DownloadItem) => {
-      setDownloads(current => {
-        const index = current.findIndex(existing => existing.id === item.id);
-        if (index < 0) return [...current, item];
-        const next = [...current];
-        next[index] = item;
-        return next;
-      });
+    const unsubscribe = api.subscribe({
+      onDownloads: setDownloads,
+      onItem: (item: DownloadItem) => {
+        setDownloads(current => {
+          const index = current.findIndex(existing => existing.id === item.id);
+          if (index < 0) return [...current, item];
+          const next = [...current];
+          next[index] = item;
+          return next;
+        });
+      },
+      onStats: setStats,
     });
-    const stopStatsUpdates = EventsOn('queue:stats', (nextStats: QueueStats) => {
-      setStats(nextStats);
-    });
-    const interval = setInterval(refreshData, 30000);
     return () => {
-      stopItemUpdates();
-      stopStatsUpdates();
-      clearInterval(interval);
+      unsubscribe();
     };
   }, [refreshData]);
 

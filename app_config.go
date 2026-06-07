@@ -3,8 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-
-	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 func (a *App) GetConfig() Config {
@@ -63,19 +61,4 @@ func (a *App) SetLanguage(language string) {
 	for _, id := range updatedIDs {
 		a.emitItemUpdate(id)
 	}
-}
-
-func (a *App) SelectFolder() string {
-	a.mu.Lock()
-	defaultDirectory := a.config.DownloadDir
-	a.mu.Unlock()
-	folder, err := runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{
-		Title:            "Selecione a pasta de download",
-		DefaultDirectory: defaultDirectory,
-	})
-	if err != nil {
-		fmt.Printf("Erro ao selecionar pasta: %v\n", err)
-		return ""
-	}
-	return folder
 }

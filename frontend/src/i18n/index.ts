@@ -42,6 +42,7 @@ export interface Translations {
   // DownloadItem
   cancel: string;
   openFolder: string;
+  downloadFile: string;
 
   // StatusBadge
   status: {
@@ -92,6 +93,7 @@ export const translations: Record<Language, Translations> = {
     clearAll: 'Limpar tudo',
     cancel: 'Cancelar',
     openFolder: 'Abrir na pasta',
+    downloadFile: 'Baixar MP3',
     status: {
       pending: 'Pendente',
       fetching_info: 'Obtendo info',
@@ -138,6 +140,7 @@ export const translations: Record<Language, Translations> = {
     clearAll: 'Clear all',
     cancel: 'Cancel',
     openFolder: 'Open folder',
+    downloadFile: 'Download MP3',
     status: {
       pending: 'Pending',
       fetching_info: 'Fetching info',

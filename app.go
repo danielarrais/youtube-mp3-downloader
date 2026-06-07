@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 type App struct {
@@ -28,6 +27,9 @@ type App struct {
 	activeID   string
 	activeStop context.CancelFunc
 	wakeWorker chan struct{}
+	onItem     func(DownloadItem)
+	onStats    func(QueueStats)
+	fixedDir   string
 }
 
 func NewApp() *App {
@@ -47,16 +49,31 @@ func NewApp() *App {
 		cacheDir:   filepath.Join(home, ".youtube-mp3-downloader-cache"),
 		queuePath:  filepath.Join(configDir, "youtube-mp3-downloader", "queue.json"),
 		wakeWorker: make(chan struct{}, 1),
+		onItem:     func(DownloadItem) {},
+		onStats:    func(QueueStats) {},
 	}
 }
 
-func (a *App) startup(ctx context.Context) {
-	a.ctx = ctx
+func NewAppWithPaths(dataDir, downloadDir string) *App {
+	app := NewApp()
+	app.config = defaultConfig(dataDir)
+	app.config.DownloadDir = downloadDir
+	app.configPath = filepath.Join(dataDir, "config.json")
+	app.cacheDir = filepath.Join(dataDir, "cache")
+	app.queuePath = filepath.Join(dataDir, "queue.json")
+	app.fixedDir = downloadDir
+	return app
+}
+
+func (a *App) start() {
 	config, err := loadConfigFile(a.configPath, a.config)
 	if err != nil {
 		fmt.Printf("Erro ao carregar configuração: %v\n", err)
 	} else {
 		a.config = config
+	}
+	if a.fixedDir != "" {
+		a.config.DownloadDir = a.fixedDir
 	}
 	if err := os.MkdirAll(a.config.DownloadDir, 0755); err != nil {
 		fmt.Printf("Erro ao criar pasta de download: %v\n", err)
@@ -73,7 +90,7 @@ func (a *App) startup(ctx context.Context) {
 	go a.worker()
 }
 
-func (a *App) shutdown(context.Context) {
+func (a *App) stop() {
 	a.mu.Lock()
 	stop := a.activeStop
 	a.mu.Unlock()
@@ -81,6 +98,17 @@ func (a *App) shutdown(context.Context) {
 		stop()
 	}
 	a.persistQueue()
+}
+
+func (a *App) setEventHandlers(onItem func(DownloadItem), onStats func(QueueStats)) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if onItem != nil {
+		a.onItem = onItem
+	}
+	if onStats != nil {
+		a.onStats = onStats
+	}
 }
 
 func (a *App) AddDownloads(urls []string, quality string) []DownloadItem {
@@ -239,9 +267,6 @@ func (a *App) updateError(id string, errMsg string) {
 }
 
 func (a *App) emitItemUpdate(id string) {
-	if a.ctx == nil {
-		return
-	}
 	a.mu.Lock()
 	item, ok := a.items[id]
 	if !ok {
@@ -249,16 +274,21 @@ func (a *App) emitItemUpdate(id string) {
 		return
 	}
 	val := *item
+	onItem := a.onItem
 	a.mu.Unlock()
-	runtime.EventsEmit(a.ctx, "download:update", val)
+	if onItem != nil {
+		onItem(val)
+	}
 }
 
 func (a *App) emitStats() {
-	if a.ctx == nil {
-		return
-	}
 	s := a.GetStats()
-	runtime.EventsEmit(a.ctx, "queue:stats", s)
+	a.mu.Lock()
+	onStats := a.onStats
+	a.mu.Unlock()
+	if onStats != nil {
+		onStats(s)
+	}
 }
 
 func (a *App) CancelDownload(id string) {

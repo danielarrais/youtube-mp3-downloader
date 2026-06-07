@@ -58,3 +58,9 @@ export interface PlaylistInfo {
   author: string;
   videos: PlaylistVideo[];
 }
+
+export interface Config {
+  download_dir: string;
+  quality: string;
+  language: string;
+}

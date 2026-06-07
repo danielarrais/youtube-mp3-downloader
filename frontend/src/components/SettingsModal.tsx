@@ -7,6 +7,7 @@ interface SettingsModalProps {
   onChooseFolder: () => Promise<string | undefined>;
   onClose: () => void;
   onSave: (downloadDir: string, quality: string) => Promise<void>;
+  canChooseFolder: boolean;
 }
 
 export function SettingsModal({
@@ -15,6 +16,7 @@ export function SettingsModal({
   onChooseFolder,
   onClose,
   onSave,
+  canChooseFolder,
 }: SettingsModalProps) {
   const { t } = useTranslation();
   const [selectedDir, setSelectedDir] = useState(downloadDir);
@@ -53,13 +55,15 @@ export function SettingsModal({
             <div className="rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-300 break-all">
               {selectedDir}
             </div>
-            <button
-              type="button"
-              onClick={chooseFolder}
-              className="rounded-lg border border-gray-600 bg-gray-700 px-4 py-2 text-sm text-gray-200 hover:bg-gray-600"
-            >
-              {t.chooseFolder}
-            </button>
+            {canChooseFolder && (
+              <button
+                type="button"
+                onClick={chooseFolder}
+                className="rounded-lg border border-gray-600 bg-gray-700 px-4 py-2 text-sm text-gray-200 hover:bg-gray-600"
+              >
+                {t.chooseFolder}
+              </button>
+            )}
           </div>
 
           <div className="space-y-2">

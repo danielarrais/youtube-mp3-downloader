@@ -1,0 +1,14 @@
+services:
+  youtube-mp3-downloader:
+    image: ${DOCKER_IMAGE:-danielarrais/youtube-mp3-downloader}:${DOCKER_TAG:-latest}
+    build:
+      context: .
+    ports:
+      - "${HOST_PORT:-8080}:8080"
+    volumes:
+      - youtube-mp3-data:/data
+      - ${DOWNLOADS_PATH:-./downloads}:/downloads
+    restart: unless-stopped
+
+volumes:
+  youtube-mp3-data:

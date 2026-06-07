@@ -64,10 +64,10 @@ export function DownloadItem({ item, onCancel, onRetry }: DownloadItemProps) {
         )}
         {canDownload && (
           <button
-            onClick={() => api.openFolder(item.file_path!)}
+            onClick={() => api.openDownload(item)}
             className="text-sm text-green-400 hover:text-green-300 transition-colors"
           >
-            {t.openFolder}
+            {api.capabilities.nativeFolders ? t.openFolder : t.downloadFile}
           </button>
         )}
       </div>

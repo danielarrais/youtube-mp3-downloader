@@ -41,3 +41,4 @@ coverage/
 /build/windows/dist/
 /build/windows/installer/resources/ffmpeg.exe
 /dist/
+/downloads/

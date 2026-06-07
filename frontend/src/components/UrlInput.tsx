@@ -162,8 +162,11 @@ export function UrlInput({ onSubmit }: UrlInputProps) {
           </label>
           <button
             type="button"
-            onClick={() => downloadDir !== '---' && api.openDirectory(downloadDir)}
-            className="text-[10px] text-gray-400 hover:text-gray-200 font-mono bg-black/30 px-2 py-1 rounded max-w-[350px] truncate border border-gray-700 transition-colors"
+            onClick={() => api.capabilities.nativeFolders
+              && downloadDir !== '---'
+              && api.openDirectory(downloadDir)}
+            disabled={!api.capabilities.nativeFolders}
+            className="text-[10px] text-gray-400 enabled:hover:text-gray-200 font-mono bg-black/30 px-2 py-1 rounded max-w-[350px] truncate border border-gray-700 transition-colors disabled:cursor-default"
             title={downloadDir}
           >
             📁 {downloadDir}
@@ -215,6 +218,7 @@ export function UrlInput({ onSubmit }: UrlInputProps) {
           onChooseFolder={handleSelectFolder}
           onClose={() => setSettingsOpen(false)}
           onSave={handleSaveSettings}
+          canChooseFolder={api.capabilities.nativeFolders}
         />
       )}
     </div>
