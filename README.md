@@ -1,42 +1,86 @@
 # YouTube MP3 Downloader
 
-Aplicativo desktop em Go, Wails e React para baixar vídeos e playlists do
-YouTube como MP3. A fila, a pasta de saída, a qualidade e o idioma permanecem
-salvos entre reinicializações.
+Desktop application built with Go, Wails, and React for downloading YouTube
+videos and playlists as MP3 files. The queue, output directory, quality, and
+language are persisted between restarts.
 
-O mesmo frontend também pode rodar como aplicação web. No desktop, ele usa a
-ponte nativa do Wails; no servidor web, usa uma API HTTP do backend Go.
+The same frontend can also run as a web application. The desktop version uses
+the native Wails bridge, while the web version communicates with the Go backend
+through an HTTP API.
 
-## Desenvolvimento
+## Project structure
 
-Requisitos:
+- `backend/` - Go application, Wails desktop host, web API, packaging, and platform build assets
+- `frontend/` - React and TypeScript interface shared by desktop and web builds
+- `scripts/` - local build helpers
+- `.github/workflows/` - validation, release, and Docker image pipelines
+
+## Technologies and libraries
+
+The versions below correspond to the direct dependencies currently in use.
+See `backend/go.mod` and `frontend/package-lock.json` for the complete
+dependency lists and exact versions.
+
+### Backend and desktop
+
+| Project | Version | Purpose |
+| --- | --- | --- |
+| [Go](https://go.dev/) | 1.26.4 | Backend, HTTP API, queue management, persistence, and download processing. |
+| [Wails](https://wails.io/docs/introduction/) | 2.12.0 | Desktop application and bridge between Go and the React frontend. |
+| [kkdai/youtube](https://github.com/kkdai/youtube) | 2.10.6 | YouTube video and playlist metadata and audio stream retrieval. |
+| [FFmpeg](https://ffmpeg.org/documentation.html) | Provided by the system or image | Converts downloaded audio into MP3 at the supported quality settings. |
+| [google/uuid](https://github.com/google/uuid) | 1.6.0 | Generates unique identifiers for queue items. |
+| [ulikunitz/xz](https://github.com/ulikunitz/xz) | 0.5.15 | Extracts Linux FFmpeg builds distributed as `tar.xz` archives. |
+
+### Frontend
+
+| Project | Version | Purpose |
+| --- | --- | --- |
+| [React](https://react.dev/reference/react) | 18.2 | Shared interface for the desktop and web versions. |
+| [TypeScript](https://www.typescriptlang.org/docs/) | 5.3 | Type checking and frontend compilation. |
+| [Vite](https://vite.dev/guide/) | 8.0 | Development server and static frontend build. |
+| [Tailwind CSS](https://tailwindcss.com/docs/) | 3.4 | Interface styling. |
+| [PostCSS](https://postcss.org/) and [Autoprefixer](https://github.com/postcss/autoprefixer) | 8.4 / 10.4 | Generated CSS processing and browser compatibility. |
+
+### Packaging and automation
+
+| Project | Purpose |
+| --- | --- |
+| [Docker](https://docs.docker.com/) | Multi-stage build and isolated execution of the web version. |
+| [Docker Compose](https://docs.docker.com/compose/) | Port, persistent volume, and container update configuration. |
+| [GitHub Actions](https://docs.github.com/actions) | Project validation and automated Docker Hub image publishing. |
+
+## Development
+
+Requirements:
 
 - Go 1.26.4+
 - Node.js 20.19+
-- Dependências nativas do Wails para o sistema operacional
+- Native Wails dependencies for the target operating system
 
-Na primeira conversão, o aplicativo procura o FFmpeg empacotado ou instalado no
-sistema. Caso não encontre, baixa e valida automaticamente uma build para
-Linux ou Windows (`amd64` e `arm64`), armazenada em
-`~/.youtube-mp3-downloader-bin/`. Portanto, o primeiro uso requer acesso à internet,
-mas o binário não precisa ser versionado no repositório.
+During the first conversion, the application looks for a bundled or
+system-installed FFmpeg. If none is found, it automatically downloads and
+validates a build for Linux or Windows (`amd64` and `arm64`) and stores it in
+`~/.youtube-mp3-downloader-bin/`. The first use therefore requires internet
+access, but the binary does not need to be committed to the repository.
 
-No Linux com WebKitGTK 4.1:
+On Linux with WebKitGTK 4.1:
 
 ```bash
+cd backend
 go run github.com/wailsapp/wails/v2/cmd/wails@v2.12.0 dev -tags webkit2_41
 ```
 
-O frontend também fica disponível em `http://localhost:5173`.
+The Vite frontend is also available at `http://localhost:5173`.
 
-Para usar no navegador com acesso aos métodos Go durante o desenvolvimento,
-abra a URL informada pelo Wails como `To develop in the browser`, e não a porta
-direta do Vite.
+To use the browser with access to the Go methods during development, open the
+URL shown by Wails after `To develop in the browser`, not the direct Vite port.
 
-## Web com Docker
+## Web with Docker
 
-A imagem contém o backend, o frontend compilado, FFmpeg e certificados TLS. A
-pipeline a publicará para `linux/amd64` e `linux/arm64` em:
+The image contains the backend, compiled frontend, FFmpeg, and TLS
+certificates. The pipeline will publish `linux/amd64` and `linux/arm64` images
+to:
 
 ```text
 docker.io/danielarrais/youtube-mp3-downloader
@@ -44,7 +88,8 @@ docker.io/danielarrais/youtube-mp3-downloader
 
 ### Docker Compose
 
-Crie a pasta que receberá os MP3 e suba a imagem pública:
+Create the directory that will receive the MP3 files and start the public
+image:
 
 ```bash
 cp .env.example .env
@@ -53,31 +98,32 @@ docker compose pull
 docker compose up -d
 ```
 
-Abra `http://localhost:8080`. Os MP3 ficam disponíveis pelo botão de download
-do navegador e também na pasta local `downloads/`.
+Open `http://localhost:8080`. Completed MP3 files can be downloaded through the
+browser and are also stored in the local `downloads/` directory.
 
-O arquivo `.env` permite trocar imagem, tag, porta publicada e pasta local:
+The `.env` file can override the image, tag, published port, and local download
+directory:
 
-| Variável do Compose | Padrão | Descrição |
+| Compose variable | Default | Description |
 | --- | --- | --- |
-| `DOCKER_IMAGE` | `danielarrais/youtube-mp3-downloader` | Repositório no Docker Hub. |
-| `DOCKER_TAG` | `latest` | Tag da imagem; por exemplo `1.0.16`. |
-| `HOST_PORT` | `8080` | Porta exposta no host. |
-| `DOWNLOADS_PATH` | `./downloads` | Pasta do host que recebe os MP3. |
+| `DOCKER_IMAGE` | `danielarrais/youtube-mp3-downloader` | Docker Hub repository. |
+| `DOCKER_TAG` | `latest` | Image tag, for example `1.0.16`. |
+| `HOST_PORT` | `8080` | Port published on the host. |
+| `DOWNLOADS_PATH` | `./downloads` | Host directory that receives completed MP3 files. |
 
-Para construir a imagem a partir do código local:
+To build the image from the local source code:
 
 ```bash
 docker compose up --build -d
 ```
 
-Para encerrar:
+To stop the service:
 
 ```bash
 docker compose down
 ```
 
-Para atualizar a imagem publicada:
+To update to the latest published image:
 
 ```bash
 docker compose pull
@@ -86,7 +132,7 @@ docker compose up -d
 
 ### Docker Run
 
-O mesmo serviço pode ser iniciado sem Compose:
+The service can also be started without Compose:
 
 ```bash
 docker volume create youtube-mp3-data
@@ -105,89 +151,92 @@ docker run -d \
   danielarrais/youtube-mp3-downloader:latest
 ```
 
-### Variáveis de ambiente
+### Environment variables
 
-| Variável | Padrão | Descrição |
+| Variable | Default | Description |
 | --- | --- | --- |
-| `WEB_ADDR` | `:8080` | Endereço e porta em que o servidor HTTP escuta. |
-| `DATA_DIR` | `/data` | Diretório da configuração, fila persistida e cache temporário. |
-| `DOWNLOAD_DIR` | `/downloads` | Diretório em que os MP3 concluídos são gravados. |
-| `HEALTHCHECK_URL` | `http://127.0.0.1:8080/healthz` | URL interna usada pelo healthcheck da imagem. |
+| `WEB_ADDR` | `:8080` | Address and port on which the HTTP server listens. |
+| `DATA_DIR` | `/data` | Directory for configuration, persisted queue, and temporary cache. |
+| `DOWNLOAD_DIR` | `/downloads` | Directory where completed MP3 files are written. |
+| `HEALTHCHECK_URL` | `http://127.0.0.1:8080/healthz` | Internal URL used by the image health check. |
 
-Ao alterar `DATA_DIR` ou `DOWNLOAD_DIR`, ajuste também o destino do volume
-correspondente. Ao alterar a porta interna em `WEB_ADDR`, atualize também
-`HEALTHCHECK_URL`. Para publicar outra porta somente no host, mantenha as
-variáveis padrão e use, por exemplo, `-p 9090:8080`.
+When changing `DATA_DIR` or `DOWNLOAD_DIR`, update the corresponding volume
+destination as well. When changing the internal port through `WEB_ADDR`, also
+update `HEALTHCHECK_URL`. To publish a different host port without changing the
+container, keep the default environment variables and use, for example,
+`-p 9090:8080`.
 
 ### Volumes
 
-| Caminho no container | Conteúdo | Recomendação |
+| Container path | Contents | Recommendation |
 | --- | --- | --- |
-| `/data` | `config.json`, `queue.json` e cache de trabalho. | Volume Docker persistente. |
-| `/downloads` | Arquivos MP3 concluídos. | Bind mount para uma pasta do host. |
+| `/data` | `config.json`, `queue.json`, and the working cache. | Persistent Docker volume. |
+| `/downloads` | Completed MP3 files. | Bind mount to a host directory. |
 
-Remover o container não apaga esses dados. `docker compose down -v` também
-remove o volume de dados e deve ser usado somente quando a fila e as
-configurações puderem ser descartadas.
+Removing the container does not delete this data. `docker compose down -v`
+also removes the data volume and should only be used when the queue and
+configuration can be discarded.
 
-Essa configuração não possui autenticação e foi projetada para uso local ou em
-rede privada. Não exponha a porta diretamente à internet.
+This configuration does not provide authentication and is intended for local
+or private network use. Do not expose the port directly to the internet.
 
-### Publicação da imagem
+### Image publishing
 
-O workflow `Docker`:
+The `Docker` workflow:
 
-- valida o build em pull requests sem publicar;
-- publica `latest` quando há push na branch `main`;
-- publica `1.2.3`, `1.2`, `1` e `sha-...` para a tag `v1.2.3`;
-- permite execução manual pelo GitHub Actions.
+- validates the image build on pull requests without publishing it;
+- publishes `latest` on pushes to the `main` branch;
+- publishes `1.2.3`, `1.2`, `1`, and `sha-...` for a `v1.2.3` tag;
+- supports manual execution through GitHub Actions.
 
-Configure estes secrets em **Settings > Secrets and variables > Actions**:
+Configure these secrets under
+**Settings > Secrets and variables > Actions**:
 
-| Secret | Valor |
+| Secret | Value |
 | --- | --- |
-| `DOCKERHUB_USERNAME` | Nome do usuário ou organização no Docker Hub. |
-| `DOCKERHUB_TOKEN` | Access token do Docker Hub com permissão de escrita. |
+| `DOCKERHUB_USERNAME` | Docker Hub user or organization name. |
+| `DOCKERHUB_TOKEN` | Docker Hub access token with write permission. |
 
-Crie previamente no Docker Hub o repositório público
-`youtube-mp3-downloader`. A pipeline fará login e publicará nele; executar os
-arquivos localmente não envia nenhuma imagem ao registry.
+Create the public `youtube-mp3-downloader` repository on Docker Hub before the
+first publication. The pipeline logs in and publishes to that repository;
+running the project locally does not upload any image to the registry.
 
-## Validação
+## Validation
 
 ```bash
 npm ci --prefix frontend
 npm run build --prefix frontend
-go test -race ./...
-go test -race -tags web ./...
-go vet ./...
+go -C backend test -race -tags webkit2_41 ./...
+go -C backend test -race -tags web ./...
+go -C backend vet -tags webkit2_41 ./...
 ```
 
 ## Build
 
-Build nativo:
+Native build:
 
 ```bash
+cd backend
 go run github.com/wailsapp/wails/v2/cmd/wails@v2.12.0 build
 ```
 
-### Instalador Windows no Linux
+### Windows installer from Linux
 
-O build via Docker baixa as ferramentas de compilação, dependências Go e Node,
-FFmpeg e WebView2:
+The Docker build downloads the compilation tools, Go and Node dependencies,
+FFmpeg, and WebView2:
 
 ```bash
 ./scripts/build-windows.sh
 ```
 
-O instalador será gravado em `build/windows/dist/`.
+The installer is written to `backend/build/windows/dist/`.
 
 ## Release
 
-Tags no formato `vX.Y.Z` executam o workflow `Release`. Ele valida o projeto,
-gera um instalador Windows `amd64` e um pacote DEB para Ubuntu 24.04+
-`amd64`, inclui o FFmpeg em ambos e publica os arquivos com `SHA256SUMS` na
-GitHub Release.
+Tags in the `vX.Y.Z` format run the `Release` workflow. It validates the
+project, creates a Windows `amd64` installer and an Ubuntu 24.04+ `amd64` DEB
+package, includes FFmpeg in both, and publishes the artifacts with
+`SHA256SUMS` to the GitHub Release.
 
 ```bash
 git tag -a v1.0.16 -m "Release v1.0.16"

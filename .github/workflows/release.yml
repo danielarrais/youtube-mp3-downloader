@@ -38,6 +38,7 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
+          cache-dependency-path: backend/go.sum
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -61,12 +62,15 @@ jobs:
         run: npm run build --prefix frontend
 
       - name: Test backend
+        working-directory: backend
         run: go test -race -tags webkit2_41 ./...
 
       - name: Vet backend
+        working-directory: backend
         run: go vet -tags webkit2_41 ./...
 
       - name: Check Go vulnerabilities
+        working-directory: backend
         run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
 
   linux:
@@ -82,6 +86,7 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
+          cache-dependency-path: backend/go.sum
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -113,14 +118,14 @@ jobs:
           echo "VERSION=$version" >> "$GITHUB_ENV"
           jq --arg version "$version" \
             '.info.productVersion = $version' \
-            wails.json > wails.release.json
-          mv wails.release.json wails.json
+            backend/wails.json > backend/wails.release.json
+          mv backend/wails.release.json backend/wails.json
 
       - name: Download verified FFmpeg
         shell: bash
         run: |
           filename="ffmpeg-master-latest-linux64-gpl.tar.xz"
-          mkdir -p build/linux/package /tmp/ffmpeg
+          mkdir -p backend/build/linux/package /tmp/ffmpeg
           curl --fail --location --retry 3 \
             "$FFMPEG_BASE_URL/checksums.sha256" \
             --output /tmp/checksums.sha256
@@ -136,10 +141,11 @@ jobs:
           tar --extract --xz --file "/tmp/$filename" --directory /tmp/ffmpeg
           ffmpeg_path="$(find /tmp/ffmpeg -type f -name ffmpeg -print -quit)"
           test -n "$ffmpeg_path"
-          install -m 0755 "$ffmpeg_path" build/linux/package/ffmpeg
-          build/linux/package/ffmpeg -version
+          install -m 0755 "$ffmpeg_path" backend/build/linux/package/ffmpeg
+          backend/build/linux/package/ffmpeg -version
 
       - name: Build Linux application
+        working-directory: backend
         run: |
           wails build \
             -platform linux/amd64 \
@@ -150,12 +156,13 @@ jobs:
 
       - name: Build DEB package
         shell: bash
+        working-directory: backend
         run: |
-          mkdir -p dist
+          mkdir -p ../dist
           nfpm package \
             --config nfpm.yaml \
             --packager deb \
-            --target "dist/youtube-mp3-downloader_${VERSION}_amd64.deb"
+            --target "../dist/youtube-mp3-downloader_${VERSION}_amd64.deb"
 
       - name: Test DEB package
         shell: bash
@@ -195,6 +202,7 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
+          cache-dependency-path: backend/go.sum
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -226,9 +234,9 @@ jobs:
           $version = $env:GITHUB_REF_NAME.TrimStart("v")
           "VERSION=$version" |
             Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          $config = Get-Content wails.json -Raw | ConvertFrom-Json
+          $config = Get-Content backend/wails.json -Raw | ConvertFrom-Json
           $config.info.productVersion = $version
-          $config | ConvertTo-Json -Depth 10 | Set-Content wails.json
+          $config | ConvertTo-Json -Depth 10 | Set-Content backend/wails.json
 
       - name: Download verified FFmpeg
         shell: pwsh
@@ -261,13 +269,14 @@ jobs:
             throw "ffmpeg.exe was not found in the downloaded archive"
           }
           New-Item -ItemType Directory `
-            -Force "build/windows/installer/resources" | Out-Null
+            -Force "backend/build/windows/installer/resources" | Out-Null
           Copy-Item $ffmpeg.FullName `
-            "build/windows/installer/resources/ffmpeg.exe"
-          & "build/windows/installer/resources/ffmpeg.exe" -version
+            "backend/build/windows/installer/resources/ffmpeg.exe"
+          & "backend/build/windows/installer/resources/ffmpeg.exe" -version
 
       - name: Build Windows installer
         shell: pwsh
+        working-directory: backend
         run: |
           wails build `
             -platform windows/amd64 `
@@ -281,9 +290,9 @@ jobs:
           if (-not $installer) {
             throw "Windows installer was not generated"
           }
-          New-Item -ItemType Directory -Force dist | Out-Null
+          New-Item -ItemType Directory -Force ../dist | Out-Null
           Copy-Item $installer.FullName `
-            "dist/youtube-mp3-downloader_${env:VERSION}_windows_amd64_installer.exe"
+            "../dist/youtube-mp3-downloader_${env:VERSION}_windows_amd64_installer.exe"
 
       - name: Test Windows installer
         shell: pwsh

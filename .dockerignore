@@ -2,9 +2,11 @@
 .github
 .idea
 bin
-build/bin
-build/windows/dist
-build/windows/installer/resources/ffmpeg.exe
-frontend/dist
+backend/build/bin
+backend/build/linux/package
+backend/build/windows/dist
+backend/build/windows/installer/resources/ffmpeg.exe
+backend/frontend/dist
 frontend/node_modules
+frontend/dist
 downloads

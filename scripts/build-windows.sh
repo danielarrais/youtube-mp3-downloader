@@ -2,13 +2,13 @@
 set -eu
 
 project_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
-output_dir="$project_dir/build/windows/dist"
+output_dir="$project_dir/backend/build/windows/dist"
 
 rm -rf "$output_dir"
 mkdir -p "$output_dir"
 
 docker build \
-    --file "$project_dir/build/windows/Dockerfile" \
+    --file "$project_dir/backend/build/windows/Dockerfile" \
     --target artifact \
     --output "type=local,dest=$output_dir" \
     "$project_dir"

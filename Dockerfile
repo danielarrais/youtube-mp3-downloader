@@ -8,11 +8,11 @@ RUN npm run build
 
 FROM golang:1.26.4-bookworm AS backend
 
-WORKDIR /src
-COPY go.mod go.sum ./
+WORKDIR /src/backend
+COPY backend/go.mod backend/go.sum ./
 RUN go mod download
-COPY . .
-COPY --from=frontend /src/frontend/dist ./frontend/dist
+COPY backend/ ./
+COPY --from=frontend /src/backend/frontend/dist ./frontend/dist
 RUN CGO_ENABLED=0 go build \
     -tags web \
     -trimpath \

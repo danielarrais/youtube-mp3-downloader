@@ -20,6 +20,8 @@ COPY . .
 
 RUN npm ci --prefix frontend
 
+WORKDIR /src/backend
+
 RUN mkdir -p build/windows/installer/resources /tmp/ffmpeg && \
     curl -L --fail --retry 3 "${FFMPEG_URL}" -o /tmp/ffmpeg.zip && \
     unzip -q /tmp/ffmpeg.zip -d /tmp/ffmpeg && \
@@ -33,4 +35,4 @@ RUN wails build \
     -clean
 
 FROM scratch AS artifact
-COPY --from=builder /src/build/bin/ /
+COPY --from=builder /src/backend/build/bin/ /

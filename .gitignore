@@ -27,18 +27,20 @@ pnpm-debug.log*
 *.prof
 *.out
 coverage/
+/backend/yt-mp3-go
+/backend/yt-mp3-go.exe
 
 # Node and Vite
-/node_modules/
-/frontend/node_modules/
+node_modules/
 /frontend/dist/
-/frontend/.vite/
+/backend/frontend/dist/
+.vite/
 
 # Wails and release artifacts
 /bin/
-/build/bin/
-/build/linux/package/
-/build/windows/dist/
-/build/windows/installer/resources/ffmpeg.exe
+/backend/build/bin/
+/backend/build/linux/package/
+/backend/build/windows/dist/
+/backend/build/windows/installer/resources/ffmpeg.exe
 /dist/
 /downloads/
