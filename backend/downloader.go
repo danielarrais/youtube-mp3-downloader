@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -314,6 +315,10 @@ func (s *YouTubeSession) DownloadAudio(ctx context.Context, video *youtube.Video
 		return "", fmt.Errorf("no audio formats found")
 	}
 
+	sort.SliceStable(formats, func(i, j int) bool {
+		return formats[i].Bitrate > formats[j].Bitrate
+	})
+
 	format := &formats[0]
 	s.client.HTTPClient = newStreamingHTTPClient()
 	stream, totalSize, err := s.client.GetStreamContext(ctx, video, format)
@@ -390,5 +395,17 @@ func ConvertToMp3(ctx context.Context, inputPath string, outputPath string, qual
 }
 
 func ffmpegMP3Args(inputPath, outputPath, bitrate string) []string {
-	return []string{"-y", "-i", inputPath, "-b:a", bitrate, "-f", "mp3", outputPath}
+	return []string{
+		"-y",
+		"-i", inputPath,
+		"-vn",
+		"-c:a", "libmp3lame",
+		"-b:a", bitrate,
+		"-ar", "44100",
+		"-ac", "2",
+		"-joint_stereo", "1",
+		"-map_metadata", "0",
+		"-f", "mp3",
+		outputPath,
+	}
 }
